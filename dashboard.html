@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سجل الحذف - Project Guard</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mute:#5b6b7a;--line:#d6dde4;--acc:#0f6b6b;--warn:#b4540a;--bar:#0f6b6b}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10171d;--card:#18222b;--ink:#e6edf3;--mute:#8fa1b1;--line:#2a3743;--acc:#4fc3c3;--warn:#f0a35e;--bar:#4fc3c3}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Segoe UI",Tahoma,Arial,sans-serif;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
+.wrap{max-width:1180px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+h1{margin:0;font-size:24px}header p{margin:2px 0 0;color:var(--mute)}
+.btn{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px}
+.kpi b{display:block;font-size:30px;line-height:1.1}.kpi span{color:var(--mute);font-size:13px}
+.kpi.hot b{color:var(--warn)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px}
+.panel h2{margin:0 0 10px;font-size:15px}
+.row{display:grid;grid-template-columns:130px 1fr 34px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.row i{display:block;height:10px;background:var(--bar);border-radius:3px}
+.row em{font-style:normal;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hours{display:flex;align-items:end;gap:3px;height:110px;direction:ltr}
+.hours div{flex:1;background:var(--bar);min-height:2px;border-radius:2px 2px 0 0;position:relative}
+.hl{display:flex;justify-content:space-between;color:var(--mute);font-size:11px;direction:ltr;margin-top:4px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.filters input,.filters select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font:inherit}
+.filters input[type=search]{flex:1;min-width:200px}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;min-width:820px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card)}
+td.f{direction:ltr;text-align:left;word-break:break-all;max-width:360px}
+td small{display:block;color:var(--mute);direction:ltr;text-align:right}
+.tag{padding:1px 8px;border-radius:10px;border:1px solid var(--line);font-size:12px}
+.tag.smb{border-color:var(--warn);color:var(--warn)}
+a{color:var(--acc)}
+.banner{border-radius:8px;padding:10px 14px;margin-bottom:12px;border:1px solid var(--line);background:var(--card)}
+.banner.ok{border-color:var(--acc)}.banner.bad{border-color:var(--warn);color:var(--warn)}
+.banner small{display:block;color:var(--mute)}
+.tag.late{border-color:var(--acc);color:var(--acc)}
+.empty{padding:40px;text-align:center;color:var(--mute)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>سجل الحذف في المشروع</h1><p id="meta">بيقرأ البيانات...</p></div>
+  <div><label class="btn">فتح events.jsonl يدوياً<input id="file" type="file" accept=".jsonl,.json,.txt" hidden></label>
+  <button class="btn" onclick="refresh()">تحديث</button></div>
+</header>
+
+<div class="banner" id="hb" hidden></div>
+<section class="kpis">
+  <div class="kpi hot"><b id="k1">0</b><span>ملف اتمسح</span></div>
+  <div class="kpi"><b id="k2">0</b><span>مستخدم عمل مسح</span></div>
+  <div class="kpi"><b id="k3">0</b><span>جهاز مختلف</span></div>
+  <div class="kpi"><b id="k4">0</b><span>حذف النهارده</span></div>
+</section>
+
+<section class="grid">
+  <div class="panel"><h2>الحذف حسب المستخدم</h2><div id="byUser"></div></div>
+  <div class="panel"><h2>الحذف حسب ساعة اليوم</h2><div class="hours" id="hours"></div><div class="hl"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div></div>
+</section>
+
+<div class="filters">
+  <input type="search" id="q" placeholder="ابحث باسم الملف أو المستخدم أو الجهاز">
+  <select id="fu"><option value="">كل المستخدمين</option></select>
+  <input type="date" id="fd">
+</div>
+<div class="tw"><table>
+  <thead><tr><th>الوقت</th><th>الملف</th><th>اللي مسح</th><th>الجهاز</th><th>الطريقة</th><th>النسخة المحفوظة</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table><div class="empty" id="empty" hidden>مفيش عمليات حذف مسجلة.</div></div>
+</div>
+
+<script>
+let data=[];const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function load(list){data=list.slice().sort((a,b)=>b.time.localeCompare(a.time));
+  const us=[...new Set(data.map(d=>d.user))].sort();
+  $('fu').innerHTML='<option value="">كل المستخدمين</option>'+us.map(u=>`<option>${esc(u)}</option>`).join('');
+  render();}
+function fmt(d){let b=d.sizeBytes;if(b==null&&d.sizeKB!=null)b=d.sizeKB*1024;if(b==null||(!d.backup&&!b))return 'الحجم غير معروف';
+  if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(2)+' MB';}
+function count(arr,key){const m={};arr.forEach(d=>m[d[key]]=(m[d[key]]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
+function render(){
+  const q=$('q').value.toLowerCase(),u=$('fu').value,day=$('fd').value;
+  const list=data.filter(d=>(!u||d.user===u)&&(!day||d.time.startsWith(day))&&(!q||[d.file,d.user,d.machine,d.ip].join(' ').toLowerCase().includes(q)));
+  const today=new Date().toISOString().slice(0,10),loc=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  $('k1').textContent=list.length;$('k2').textContent=new Set(list.map(d=>d.user)).size;
+  $('k3').textContent=new Set(list.map(d=>d.machine||d.ip).filter(Boolean)).size;
+  $('k4').textContent=data.filter(d=>d.time.startsWith(loc)).length;
+  const bu=count(list,'user'),mx=bu.length?bu[0][1]:1;
+  $('byUser').innerHTML=bu.length?bu.slice(0,8).map(([n,c])=>`<div class="row"><em title="${esc(n)}">${esc(n)}</em><i style="width:${c/mx*100}%"></i><span>${c}</span></div>`).join(''):'<div class="empty">لا يوجد</div>';
+  const h=Array(24).fill(0);list.forEach(d=>h[+d.time.slice(11,13)]++);const hm=Math.max(...h,1);
+  $('hours').innerHTML=h.map((c,i)=>`<div style="height:${c/hm*100}%" title="${i}:00 - ${c}"></div>`).join('');
+  $('rows').innerHTML=list.map(d=>`<tr>
+    <td>${esc(d.time.replace('T',' '))}</td>
+    <td class="f">${esc(d.relative)}<small>${fmt(d)}${d.inFolder?' - اتمسح ضمن فولدر':''}</small></td>
+    <td>${esc(d.user)}${d.user==='Unknown'?`<small>${d.note==='auditNotFound'?'مفيش Audit event للحذف ده (راجع شريط الصحة فوق)':'لسه بيدوّر في الـ Security log...'}</small>`:''}</td>
+    <td>${esc(d.machine||'-')}${d.ip?`<small>${esc(d.ip)}</small>`:''}</td>
+    <td><span class="tag ${d.source==='SMB'?'smb':''}">${d.source==='SMB'?'من جهاز عبر الشير':d.source==='Local'?'على السيرفر نفسه':'غير معروف'}</span>${d.detected==='late'||d.detected==='recovered'?'<span class="tag late">اتكشف بعد الواقعة</span>':''}${d.app?`<small>${esc(d.app)}</small>`:''}</td>
+    <td>${d.backup?`<a href="${encodeURI(d.backup)}" target="_blank">فتح النسخة</a><small>${esc(d.backup)}</small>`:d.note==='purged'?'النسخة اتمسحت بالتنضيف الدوري':'مفيش نسخة (الملف اتمسح بعد ثواني من إنشائه)'}</td></tr>`).join('');
+  $('empty').hidden=list.length>0;
+  $('meta').textContent=data.length?`آخر عملية: ${data[0].time.replace('T',' ')} - إجمالي المسجل ${data.length}`:'لسه مفيش عمليات حذف.';
+}
+['q','fu','fd'].forEach(i=>$(i).addEventListener('input',render));
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
+  f.text().then(t=>{const m=new Map();t.split(/\r?\n/).filter(Boolean).forEach(l=>{try{const o=JSON.parse(l.replace(/^\uFEFF/,''));if(o.patch){const b=m.get(o.id);if(b){delete o.patch;Object.assign(b,o)}}else m.set(o.id||('r'+m.size),o)}catch(e){}});load([...m.values()]);});});
+function health(){const h=window.GUARD_HEALTH,el=$('hb');if(!h){el.hidden=true;return}
+  const hb=new Date(h.heartbeat),age=(Date.now()-hb.getTime())/1000,bad=age>120;
+  let t=bad?`المراقبة واقفة! آخر نبضة من ${Math.round(age/60)} دقيقة (${esc(h.heartbeat.replace('T',' '))}). افتح Task Scheduler وشوف ProjectGuard.`:`المراقبة شغالة - آخر نبضة ${esc(h.heartbeat.replace('T',' '))}`;
+  const n=[];
+  if(h.auditNote)n.push(h.auditNote);
+  if(h.unknown)n.push(`${h.unknown} عملية لسه بتتدوّر على صاحبها`);
+  if(h.copyFallbacks)n.push(`${h.copyFallbacks} ملف اتنسخ نسخة حقيقية لأن الـ hard link مش متاح له`);
+  (h.gaps||[]).forEach(g=>n.push(`المراقبة كانت واقفة من ${g.from.replace('T',' ')} لحد ${g.to.replace('T',' ')} - اللي اتمسح فيها اتكشف عند التشغيل`));
+  if(h.lastError)n.push('آخر خطأ: '+h.lastError);
+  el.className='banner '+(bad||h.auditNote?'bad':'ok');el.hidden=false;
+  el.innerHTML=`<b>${t}</b>`+n.map(x=>`<small>${esc(x)}</small>`).join('');}
+function refresh(){let n=2;const done=()=>{if(--n===0){load(window.GUARD_DATA||[]);health()}};
+  ['data.js','health.js'].forEach(f=>{const s=document.createElement('script');s.src=f+'?'+Date.now();s.onload=s.onerror=()=>{s.remove();done()};document.head.appendChild(s)})}
+setInterval(()=>{if(!$('file').files.length)refresh()},30000);
+load(window.GUARD_DATA||[]);
+</script>
+<script>
+// محاولة تحميل data.js، ولو فشل نقرأ events.jsonl مباشرة (Fallback)
+function loadData() {
+    const s = document.createElement('script');
+    s.src = 'data.js?' + Date.now();
+    s.onload = () => { if(window.GUARD_DATA) load(window.GUARD_DATA); };
+    s.onerror = () => {
+        fetch('events.jsonl?' + Date.now())
+            .then(r => r.text())
+            .then(t => {
+                const m = new Map();
+                t.split(/\r?\n/).filter(Boolean).forEach(l => {
+                    try {
+                        const o = JSON.parse(l.replace(/^\uFEFF/, ''));
+                        if(o.patch) { const b = m.get(o.id); if(b) { delete o.patch; Object.assign(b, o); } }
+                        else m.set(o.id || ('r' + m.size), o);
+                    } catch(e) {}
+                });
+                load([...m.values()]);
+            })
+            .catch(() => load([]));
+    };
+    document.head.appendChild(s);
+}
+loadData();
+</script>
+<script src="health.js" onload="health()" onerror="health()"></script>
+</body>
+</html>
